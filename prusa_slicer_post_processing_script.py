@@ -35,6 +35,7 @@ Known issues:
 -MaxDistanceFromPerimeter >=2*perimeterwidth=weird result.
 -avoid using the code multiple times onto the same gcode, as errors might accumulate.
 """
+
 #!/usr/bin/python
 import sys
 import os
@@ -51,6 +52,12 @@ import random
 def makeFullSettingDict(gCodeSettingDict:dict) -> dict: 
     """Merge Two Dictionarys and set some keys/values explicitly"""
     #the slicer-settings will be imported from GCode. But some are Arc-specific and need to be adapted by you.
+    _perimeter_extrusion_width = 0.4
+    if "%" in str(gCodeSettingDict.get("perimeter_extrusion_width")) :
+         _perimeter_extrusion_width= gCodeSettingDict.get("nozzle_diameter")* (float(gCodeSettingDict.get("perimeter_extrusion_width").strip("%"))/100)
+    else :
+        _perimeter_extrusion_width=float(gCodeSettingDict.get("perimeter_extrusion_width"))
+
     AddManualSettingsDict={
         #adapt these settings as needed for your specific geometry/printer:
         "AllowedSpaceForArcs": Polygon([[0,0],[500,0],[500,500],[0,500]]),#have control in which areas Arcs shall be generated
@@ -58,8 +65,8 @@ def makeFullSettingDict(gCodeSettingDict:dict) -> dict:
         "ArcMinPrintSpeed":0.5*60,#Unit:mm/min
         "ArcPrintSpeed":1.5*60, #Unit:mm/min
         "ArcTravelFeedRate":30*60, # slower travel speed, Unit:mm/min
-        "ExtendIntoPerimeter":2.0*gCodeSettingDict.get("perimeter_extrusion_width"), #min=0.5extrusionwidth!, extends the Area for arc generation, put higher to go through small passages. Unit:mm
-        "MaxDistanceFromPerimeter":2*gCodeSettingDict.get("perimeter_extrusion_width"),#Control how much bumpiness you allow between arcs and perimeter. lower will follow perimeter better, but create a lot of very small arcs. Should be more that 1 Arcwidth! Unit:mm
+        "ExtendIntoPerimeter":2.0*_perimeter_extrusion_width, #min=0.5extrusionwidth!, extends the Area for arc generation, put higher to go through small passages. Unit:mm
+        "MaxDistanceFromPerimeter":2*_perimeter_extrusion_width,#Control how much bumpiness you allow between arcs and perimeter. lower will follow perimeter better, but create a lot of very small arcs. Should be more that 1 Arcwidth! Unit:mm
         "MinArea":5*10,#Unit:mm2
         "MinBridgeLength":5,#Unit:mm
         "RMax":100, # the max radius of the arcs.
@@ -79,7 +86,7 @@ def makeFullSettingDict(gCodeSettingDict:dict) -> dict:
         "UseLeastAmountOfCenterPoints":False, # always generates arcs until rMax is reached, divide the arcs into pieces in needed. reduces the amount of centerpoints.
     
         #settings for easier debugging:
-        "plotStart":False, # plot the detected geoemtry in the prev Layer and the StartLine for Arc-Generation, use for debugging
+        "plotStart":False, # plot the detected geometry in the prev Layer and the StartLine for Arc-Generation, use for debugging
         "plotArcsEachStep":False, #plot arcs for every filled polygon. use for debugging
         "plotArcsFinal":False, #plot arcs for every filled polygon, when completely filled. use for debugging
         "plotDetectedInfillPoly":False # plot each detected overhang polygon, use for debugging.
@@ -865,6 +872,7 @@ def checkforNecesarrySettings(gCodeSettingDict:dict)->bool:
     if not gCodeSettingDict.get("avoid_crossing_perimeters"):
         warnings.warn("Travel Moves may cross the outline and therefore cause artefacts in arc generation.")    
     return True
+    
 def calcEStepsPerMM(settingsdict:dict)->float:
     eVol = (settingsdict.get("nozzle_diameter")/2)**2 * np.pi *settingsdict.get("ArcExtrusionMultiplier",1)#printing in midair will result in circular shape. Scource: https://manual.slic3r.org/advanced/flow-math
     if settingsdict.get("use_volumetric_e"):
@@ -928,4 +936,5 @@ warnings.showwarning = _warning
 
 if __name__=="__main__":
     gCodeFileStream,path2GCode = getFileStreamAndPath()
+    print("path2GCode {}".format(path2GCode))
     main(gCodeFileStream,path2GCode)
