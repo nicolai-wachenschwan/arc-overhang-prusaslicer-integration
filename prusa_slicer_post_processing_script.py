@@ -52,9 +52,9 @@ import random
 def makeFullSettingDict(gCodeSettingDict:dict) -> dict: 
     """Merge Two Dictionarys and set some keys/values explicitly"""
     #the slicer-settings will be imported from GCode. But some are Arc-specific and need to be adapted by you.
-    _perimeter_extrusion_width = 0.4
+    _perimeter_extrusion_width=0.4
     if "%" in str(gCodeSettingDict.get("perimeter_extrusion_width")) :
-         _perimeter_extrusion_width= gCodeSettingDict.get("nozzle_diameter")* (float(gCodeSettingDict.get("perimeter_extrusion_width").strip("%"))/100)
+        _perimeter_extrusion_width=gCodeSettingDict.get("nozzle_diameter")*(float(gCodeSettingDict.get("perimeter_extrusion_width").strip("%"))/100)
     else :
         _perimeter_extrusion_width=float(gCodeSettingDict.get("perimeter_extrusion_width"))
 
