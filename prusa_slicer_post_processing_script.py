@@ -61,6 +61,9 @@ def makeFullSettingDict(gCodeSettingDict:dict) -> dict:
         "MinBridgeLength":5,#Unit:mm
         "RMax":110, # the max radius of the arcs.
         
+        #aditional settings
+        "TimeLapseEveryNArcs": 0, #inserts M240 after N ArcLines, 5 is a good value to start
+
         #Special cooling to prevent warping:
         "aboveArcsFanSpeed":25, #0->255, 255=100%
         "aboveArcsInfillPrintSpeed":10*60, # Unit :mm/min
@@ -139,7 +142,7 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
                 if layer.validpolys:
                     modify=True
                     gcodeWasModified=True
-                    print(f"overhang found layer {idl}:",len(layer.polys))
+                    print(f"overhang found layer {idl}: Z{layer.z}: ",len(layer.polys))
                     #set special cooling settings for the follow up layers
                     maxZ=layer.z+parameters.get("specialCoolingZdist")
                     idoffset=1
@@ -281,7 +284,7 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
                         #plt.show()
                         for ida,arc in enumerate(arcs4gcode):
                             if not arc.is_empty:    
-                                arcGCode=arc2GCode(arcline=arc,eStepsPerMM=eStepsPerMM,arcidx=ida)
+                                arcGCode=arc2GCode(arcline=arc,eStepsPerMM=eStepsPerMM,arcidx=ida,timeLapseEveryNArcs=parameters.get("TimeLapseEveryNArcs"))
                                 arcOverhangGCode.append(arcGCode)
 
                 #apply special cooling settings:    
@@ -1120,7 +1123,7 @@ def retractGCode(retract:bool=True,kwargs:dict={})->str:
 def setFeedRateGCode(F:int)->str:
     return f"G1 F{F}\n"     
 
-def arc2GCode(arcline:LineString,eStepsPerMM:float,arcidx=None,kwargs={})->list:
+def arc2GCode(arcline:LineString,eStepsPerMM:float,arcidx=None,timeLapseEveryNArcs=0,kwargs={})->list:
     GCodeLines=[]
     p1=None
     pts=[Point(p) for p in arcline.coords]
@@ -1136,6 +1139,8 @@ def arc2GCode(arcline:LineString,eStepsPerMM:float,arcidx=None,kwargs={})->list:
     for idp,p in enumerate(pts):
         if idp==0:
             p1=p
+            if timeLapseEveryNArcs > 0 and arcidx and arcidx % timeLapseEveryNArcs == 0:
+                GCodeLines.append("M240\n")
             GCodeLines.append(f";Arc {arcidx if arcidx else ' '} Length:{arcline.length}\n")
             GCodeLines.append(p2GCode(p,F=kwargs.get('ArcTravelFeedRate',100*60)))#feedrate is mm/min...
             GCodeLines.append(retractGCode(retract=False))
