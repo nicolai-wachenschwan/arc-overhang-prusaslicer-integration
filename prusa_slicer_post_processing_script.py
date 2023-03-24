@@ -276,7 +276,7 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
                             plt.show()  
                         #generate gcode for arc and insert at the beginning of the layer
                         eStepsPerMM=calcEStepsPerMM(parameters)
-                        arcOverhangGCode.append(f"M106 S{np.round(parameters.get('bridge_fan_speed',100)*2.55)}")#turn cooling Fan on at Bridge Setting
+                        arcOverhangGCode.append(f"M106 S{np.round(parameters.get('bridge_fan_speed',100)*2.55)}\n")#turn cooling Fan on at Bridge Setting
                         #for arc in arcs4gcode:
                         #    plot_geometry(arc)
                         #    plot_geometry(Point(arc.coords[0]))
@@ -361,7 +361,7 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
                                     modifiedlayer.lines.append(f"M106 S{layer.fansetting:.0f}\n")
                                     messedWithFan=False
                                 if messedWithSpeed:
-                                    modifiedlayer.lines.append(curPrintSpeed)
+                                    modifiedlayer.lines.append(curPrintSpeed+"\n")
                                     messedWithSpeed=False
                                 modifiedlayer.lines.append(line)
                     if messedWithFan:
