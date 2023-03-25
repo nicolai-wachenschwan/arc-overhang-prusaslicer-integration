@@ -1179,4 +1179,5 @@ if __name__=="__main__":
     skipInput=False
     if platform.system()!="Windows":
         skipInput=True
-    main(gCodeFileStream,path2GCode, skipInput)
+    if input("y or n") == "y":
+        main(gCodeFileStream,path2GCode, skipInput)
