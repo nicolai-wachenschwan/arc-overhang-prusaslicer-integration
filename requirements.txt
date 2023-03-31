@@ -1,4 +1,4 @@
-matplotlib==3.6.2
+matplotlib==3.6.2; python_version >= '3.5'
 numpy==1.23.5
 Shapely==2.0.1
 numpy-hilbert-curve==1.0.1
