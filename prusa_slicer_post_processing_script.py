@@ -102,7 +102,7 @@ def makeFullSettingDict(gCodeSettingDict:dict) -> dict:
 ################################# MAIN FUNCTION #################################
 #################################################################################    
 #at the top, for better reading
-def main(gCodeFileStream,path2GCode,skipInput)->None:
+def main(gCodeFileStream,path2GCode,path2Output,skipInput)->None:
     '''Here all the work is done, therefore it is much to long.'''
     gCodeLines=gCodeFileStream.readlines()
     gCodeSettingDict=readSettingsFromGCode2dict(gCodeLines)
@@ -366,8 +366,11 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
                         messedWithFan=False        
                     layerobjs[idl]=modifiedlayer  # overwrite the infos
     if gcodeWasModified:
-        f=open(path2GCode,"w")
-        print("overwriting file")
+        f=open(path2Output,"w")
+        if path2GCode == path2Output:
+            print("overwriting file")
+        else:
+            print("writing file")
         for layer in layerobjs:
             f.writelines(layer.lines)
         f.close()   
@@ -382,16 +385,20 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
 ###################################################################################################
 
 def getFileStreamAndPath(read=True):
-    if len(sys.argv) != 2:
-        print("Usage: python3 ex1.py <filename>")
+    if len(sys.argv) not in [2, 3]:
+        print("Usage: python3 ex1.py <filename> [<output>]")
         sys.exit(1)
     filepath = sys.argv[1]
+    if len(sys.argv) == 2:
+        path2Output = filepath
+    else:
+        path2Output = sys.argv[2]
     try:
         if read:
             f = open(filepath, "r")
         else:
             f=open(filepath, "w")    
-        return f,filepath
+        return f,filepath,path2Output
     except IOError:
         input("File not found.Press enter.")
         sys.exit(1)
@@ -1175,8 +1182,8 @@ warnings.showwarning = _warning
 ################################# MAIN EXECUTION #################################
 ##################################################################################
 if __name__=="__main__":
-    gCodeFileStream,path2GCode = getFileStreamAndPath()
+    gCodeFileStream,path2GCode,path2Output = getFileStreamAndPath()
     skipInput=False
     if platform.system()!="Windows":
         skipInput=True
-    main(gCodeFileStream,path2GCode, skipInput)
+    main(gCodeFileStream,path2GCode,path2Output,skipInput)
