@@ -41,7 +41,7 @@ For more details visit: https://github.com/stmcculloch/arc-overhang
 #### Option A) via Console
 Simply open your system console and type 'python ' 
 followed by the path to this script 
-and the path of the gcode file. Will overwrite the file.
+and the path of the gcode file. Will overwrite the file unless a second file path to output the modified gcode to is provided.
 #### Option B) use it as a automatic post-processing script in PrusaSlicer
 1. open PrusaSlicer, go to print-settings-tab->output-options. Locate the window for post-processing-script. 
 2. In that window enter: `C:\full\path\to\your\python.exe C:\full\path\to\this\script\including\prusa_slicer_post_processing_script.py`  (with blank space between the two paths!). For unix like systems (linux, macOS, ecc.) use the `/` instead of `\`, obtaining something like this: `full/path/to/your/python full/path/to/this/script/including/prusa_slicer_post_processing_script.py`
