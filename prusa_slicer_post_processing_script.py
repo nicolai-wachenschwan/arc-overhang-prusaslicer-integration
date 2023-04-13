@@ -61,7 +61,9 @@ def makeFullSettingDict(gCodeSettingDict:dict) -> dict:
         "MaxDistanceFromPerimeter":2*gCodeSettingDict.get("perimeter_extrusion_width"),#Control how much bumpiness you allow between arcs and perimeter. lower will follow perimeter better, but create a lot of very small arcs. Should be more that 1 Arcwidth! Unit:mm
         "MinArea":5*10,#Unit:mm2
         "MinBridgeLength":5,#Unit:mm
+        "Path2Output":r"", #leave empty to overwrite the file or write to a new file. Full path required.
         "RMax":110, # the max radius of the arcs.
+        "TimeLapseEveryNArcs": 0, #deactivate with 0, inserts M240 after N ArcLines, 5 is a good value to start.
 
         #Special cooling to prevent warping:
         "aboveArcsFanSpeed":25, #0->255, 255=100%
@@ -141,7 +143,7 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
                 if layer.validpolys:
                     modify=True
                     gcodeWasModified=True
-                    print(f"overhang found layer {idl}:",len(layer.polys))
+                    print(f"overhang found layer {idl}:",len(layer.polys), f"Z: {layer.z:.2f}")
                     #set special cooling settings for the follow up layers
                     maxZ=layer.z+parameters.get("specialCoolingZdist")
                     idoffset=1
@@ -170,7 +172,7 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
                         #find StartPoint and StartLineString
                         startLineString,boundaryWithOutStartLine=prevLayer.makeStartLineString(poly,parameters)
                         if startLineString is None:
-                            warnings.warn("Skipping Polygon because to StartLine Found")
+                            warnings.warn("Skipping Polygon because no StartLine Found")
                             continue
                         startpt=getStartPtOnLS(startLineString,parameters)
                         remainingSpace=poly
@@ -275,7 +277,7 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
                             plt.show()
                         #generate gcode for arc and insert at the beginning of the layer
                         eStepsPerMM=calcEStepsPerMM(parameters)
-                        arcOverhangGCode.append(f"M106 S{np.round(parameters.get('bridge_fan_speed',100)*2.55)}")#turn cooling Fan on at Bridge Setting
+                        arcOverhangGCode.append(f"M106 S{np.round(parameters.get('bridge_fan_speed',100)*2.55)}\n")#turn cooling Fan on at Bridge Setting
                         #for arc in arcs4gcode:
                         #    plot_geometry(arc)
                         #    plot_geometry(Point(arc.coords[0]))
@@ -285,6 +287,9 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
                             if not arc.is_empty:
                                 arcGCode=arc2GCode(arcline=arc,eStepsPerMM=eStepsPerMM,arcidx=ida)
                                 arcOverhangGCode.append(arcGCode)
+                                if parameters.get("TimeLapseEveryNArcs")>0:
+                                    if ida%parameters.get("TimeLapseEveryNArcs"):
+                                        arcOverhangGCode.append("M240\n")
 
                 #apply special cooling settings:
                 if len(layer.oldpolys)>0:
@@ -360,7 +365,7 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
                                     modifiedlayer.lines.append(f"M106 S{layer.fansetting:.0f}\n")
                                     messedWithFan=False
                                 if messedWithSpeed:
-                                    modifiedlayer.lines.append(curPrintSpeed)
+                                    modifiedlayer.lines.append(curPrintSpeed+"\n")
                                     messedWithSpeed=False
                                 modifiedlayer.lines.append(line)
                     if messedWithFan:
@@ -368,8 +373,15 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
                         messedWithFan=False
                     layerobjs[idl]=modifiedlayer  # overwrite the infos
     if gcodeWasModified:
+        overwrite=True
+        if parameters.get("Path2Output"):
+            path2GCode=parameters.get("Path2Output")
+            overwrite=False
         f=open(path2GCode,"w")
-        print("overwriting file")
+        if overwrite:
+            print("overwriting file")
+        else:
+            print("write to",path2GCode)
         for layer in layerobjs:
             f.writelines(layer.lines)
         f.close()
@@ -1052,11 +1064,8 @@ def readSettingsFromGCode2dict(gcodeLines:list)->dict:
     gCodeSettingDict={}
     isSetting=False
     for line in gcodeLines:
-        if "slicer_config = begin" in line and line[0]==";": #original: ; prusaslicer_config = begin, reduced for compatability with superslicer
+        if "; prusaslicer_config = begin" in line:
             isSetting=True
-            continue
-        if "slicer_config = end" in line and line[0]==";":
-            isSetting=False
             continue
         if isSetting :
             setting=line.strip(";").strip("\n").split("= ")
@@ -1082,7 +1091,7 @@ def checkforNecesarrySettings(gCodeSettingDict:dict)->bool:
         warnings.warn("Script only works with extrusion_width and perimeter_extrusion_width and solid_infill_extrusion_width>0. Change in PrusaSlicer acordingly.")
         return False
     if not gCodeSettingDict.get("overhangs"):
-        warnings.warn(" 'Detect Bridging Perimeters' disabled in PrusaSlicer. Activate in PrusaSlicer for script success!")
+        warnings.warn("Overhang detection disabled in PrusaSlicer. Activate in PrusaSlicer for script success!")
         return False
     if gCodeSettingDict.get("bridge_speed")>5:
         warnings.warn(f"Your Bridging Speed is set to {gCodeSettingDict.get('bridge_speed'):.0f} mm/s in PrusaSlicer. This can cause problems with warping.<=5mm/s is recommended")
