@@ -478,7 +478,12 @@ class Layer():
                 if currenttype:
                     self.features.append([currenttype,buff,start])
                     buff=[]
-                    start=idl                        
+                    start=idl
+                    
+                    if self.lines[start - 1].startswith("G1 E") or not "E" in self.lines[start - 1]: # if a travel move came right before this feature:
+                        start -= 1
+                        while not "E" in self.lines[start - 1]: # include this travel move in the feature (excluding the first retraction step, if applicable)
+                            start -= 1
                 currenttype=line
             else:
                 buff.append(line)  
@@ -611,7 +616,8 @@ class Layer():
                             #print(f"Layer {self.layernumber}: try to split feature. No. of pts before:",len(pts))
                             if len(pts)>=2:#make at least 1 ls
                                 parts.append(pts)
-                                pts=[]# update self.features... TODO
+                            # clear points, even if we don't have enough to make a part
+                            pts=[]# update self.features... TODO
                         elif "E" in line:     #maybe fix error of included travel moves? 
                             p=getPtfromCmd(line)
                             if p:
