@@ -110,6 +110,7 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
         raise ValueError("Incompatible Settings used!") 
     layerobjs=[]
     gcodeWasModified=False
+    numOverhangs=0
     if gCodeFileStream:
         layers=splitGCodeIntoLayers(gCodeLines)
         gCodeFileStream.close()
@@ -134,8 +135,7 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
 
                 #ARC GENERATION
                 if layer.validpolys:
-                    modify=True
-                    gcodeWasModified=True
+                    numOverhangs += 1
                     print(f"overhang found layer {idl}:",len(layer.polys), f"Z: {layer.z:.2f}")
                     #set special cooling settings for the follow up layers
                     maxZ=layer.z+parameters.get("specialCoolingZdist")
@@ -283,9 +283,12 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
                                 if parameters.get("TimeLapseEveryNArcs")>0:
                                     if ida%parameters.get("TimeLapseEveryNArcs"):
                                         arcOverhangGCode.append("M240\n")
+                                        
+                        modify=True
+                        gcodeWasModified=True
 
                 #apply special cooling settings:    
-                if len(layer.oldpolys)>0:
+                if len(layer.oldpolys)>0 and gcodeWasModified:
                     modify=True
                     print("oldpolys found in layer:",idl)
                     layer.spotSolidInfill()
@@ -308,9 +311,10 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
                     curPrintSpeed="G1 F600"
                     messedWithSpeed=False
                     messedWithFan=False
-                    layer.prepareDeletion(featurename="Bridge",polys=layer.validpolys)
-                    if len(layer.oldpolys)>0:
-                        layer.prepareDeletion(featurename=":Solid",polys=layer.oldpolys)
+                    if gcodeWasModified:
+                        layer.prepareDeletion(featurename="Bridge",polys=layer.validpolys)
+                        if len(layer.oldpolys)>0:
+                            layer.prepareDeletion(featurename=":Solid",polys=layer.oldpolys)
                     #print("FEATURES:",[(f[0],f[2]) for f in layer.features])
                     injectionStart=None
                     print("modifying GCode")
@@ -379,7 +383,10 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
             f.writelines(layer.lines)
         f.close()   
     else:
-        print(f"Analysed {len(layerobjs)} Layers, but no matching overhangs found->no arcs generated. If unexpected: look if restricting settings like 'minArea' or 'MinBridgeLength' are correct.")     
+        if numOverhangs > 0:
+            print(f"Found {numOverhangs} overhangs, but no arcs could be generated due to unusual geometry.")
+        else:
+            print(f"Analysed {len(layerobjs)} Layers, but no matching overhangs found->no arcs generated. If unexpected: look if restricting settings like 'minArea' or 'MinBridgeLength' are correct.")
     #os.startfile(path2GCode, 'open')
     print("Script execution complete.")
     if not skipInput:
