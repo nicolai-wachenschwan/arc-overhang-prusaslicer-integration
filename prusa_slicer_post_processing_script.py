@@ -65,7 +65,7 @@ def makeFullSettingDict(gCodeSettingDict:dict) -> dict:
         "aboveArcsPerimeterPrintSpeed":3*60, #Unit: mm/min
         "applyAboveFanSpeedToWholeLayer":True,
         "CoolingSettingDetectionDistance":5, #if the gcode line is closer than this distance to an infill polygon the cooling settings will be applied. Unit:mm
-        "specialCoolingZdist":3, #use the special cooling XX mm above the arcs.
+        "specialCoolingZdist":3, #use the special cooling XX mm above the arcs. Set to a negative value to disable (not recommended).
 
         #advanced Settings, you should not need to touch these.
         "ArcExtrusionMultiplier":1.35,
@@ -97,7 +97,7 @@ def makeFullSettingDict(gCodeSettingDict:dict) -> dict:
     return gCodeSettingDict
 
 ################################# MAIN FUNCTION #################################
-#################################################################################    
+#################################################################################
 #at the top, for better reading
 def main(gCodeFileStream,path2GCode,skipInput)->None:
     '''Here all the work is done, therefore it is much to long.'''
@@ -381,7 +381,7 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
             print("write to",path2GCode)    
         for layer in layerobjs:
             f.writelines(layer.lines)
-        f.close()   
+        f.close()
     else:
         if numOverhangs > 0:
             print(f"Found {numOverhangs} overhangs, but no arcs could be generated due to unusual geometry.")
@@ -442,10 +442,17 @@ def getPtfromCmd(line:str)->Point:
 
 def makePolygonFromGCode(lines:list)->Polygon:
     pts=[]
+    wiping=False
     for line in lines:
-        if ";WIPE" in line:
-            break
-        if "G1" in line:
+        if line.startswith(";WIPE_END"):
+            wiping=False
+        elif line.startswith(";WIPE_START"):
+            wiping=True
+        
+        if wiping:
+            continue
+        
+        if line.startswith("G1 X"):
             p=getPtfromCmd(line)
             if p:
                 pts.append(p)
@@ -453,7 +460,7 @@ def makePolygonFromGCode(lines:list)->Polygon:
         return Polygon(pts)
     else:
         #print("invalid poly: not enough pts")
-        return None  
+        return None
 
 ################################# CLASSES #################################
 ###########################################################################
@@ -493,7 +500,7 @@ class Layer():
                             start -= 1
                 currenttype=line
             else:
-                buff.append(line)  
+                buff.append(line)
         self.features.append([currenttype,buff,start])# fetch last one
     def addZ(self,z:float=None)->None:
         if z:
@@ -521,7 +528,7 @@ class Layer():
             return None
         lines=self.features[idf-1][1]
         for line in reversed(lines):
-            if "G1" in line:
+            if line.startswith("G1 X"):
                 return getPtfromCmd(line)
 
     def makeExternalPerimeter2Polys(self)->None:
@@ -541,17 +548,18 @@ class Layer():
                             warnings.warn(f"Layer {self.layernumber}: Could not fetch real StartPoint.")
                 linesWithStart=linesWithStart+lines
                 extPerimeterIsStarted=True
-            if (idf==len(self.features)-1 and extPerimeterIsStarted) or (extPerimeterIsStarted and not ("External" in ftype or "Overhang" in ftype)) :#finish the poly if end of featurelist or different feature
+            if extPerimeterIsStarted and (idf==len(self.features)-1 or not ("External" in ftype or "Overhang" in ftype)) :#finish the poly if end of featurelist or different feature
                 poly=makePolygonFromGCode(linesWithStart)
                 if poly:
-                    self.extPerimeterPolys.append(poly) 
-                extPerimeterIsStarted=False   
+                    self.extPerimeterPolys.append(poly)
+                extPerimeterIsStarted=False
+
     def makeStartLineString(self,poly:Polygon,kwargs:dict={}):
         if not self.extPerimeterPolys:
             self.makeExternalPerimeter2Polys()
         if len(self.extPerimeterPolys)<1:
             warnings.warn(f"Layer {self.layernumber}: No ExternalPerimeterPolys found in prev Layer")
-            return None,None   
+            return None,None
         for ep in self.extPerimeterPolys:
             ep=ep.buffer(1e-2)# avoid self intersection error
             if ep.intersects(poly):
@@ -561,19 +569,19 @@ class Layer():
                     if poly.contains(startArea):#if inside no boundarys can overlap.
                         startLineString=startArea.boundary
                         boundaryLineString=poly.boundary
-                        if startLineString.is_empty:#still empty? unlikely to happen       
+                        if startLineString.is_empty:#still empty? unlikely to happen
                             plt.title("StartLineString is None")
                             plot_geometry(poly,'b')
                             plot_geometry(startArea,filled=True)
-                            plot_geometry([ep for ep in self.extPerimeterPolys])  
+                            plot_geometry([ep for ep in self.extPerimeterPolys])
                             plt.legend(["currentLayerPoly","StartArea","prevLayerPoly"])
                             plt.axis('square')
-                            plt.show()  
+                            plt.show()
                             warnings.warn(f"Layer {self.layernumber}: No Intersection in Boundary,Poly+ExternalPoly")
                             return None,None
-                else:    
+                else:
                     boundaryLineString=poly.boundary.difference(startArea.boundary.buffer(1e-2))
-                #print("STARTLINESTRING TYPE:",startLineString.geom_type)  
+                #print("STARTLINESTRING TYPE:",startLineString.geom_type)
                 if kwargs.get("plotStart"):
                     print("Geom-Type:",poly.geom_type)
                     plot_geometry(poly,color="b")
@@ -582,15 +590,15 @@ class Layer():
                     plt.title("Start-Geometry")
                     plt.legend(["Poly4ArcOverhang","External Perimeter prev Layer","StartLine for Arc Generation"])
                     plt.axis('square')
-                    plt.show()  
+                    plt.show()
                 return startLineString,boundaryLineString
-        #end of for loop, and no intersection found        
+        #end of for loop, and no intersection found
         plt.title("no intersection with prev Layer Boundary")
         plot_geometry(poly,'b')
-        plot_geometry([ep for ep in self.extPerimeterPolys])  
+        plot_geometry([ep for ep in self.extPerimeterPolys])
         plt.legend(["currentLayerPoly","prevLayerPoly"])
         plt.axis('square')
-        plt.show()  
+        plt.show()
         warnings.warn(f"Layer {self.layernumber}: No intersection with prevLayer External Perimeter detected") 
         return None,None
 
@@ -604,6 +612,7 @@ class Layer():
         elif mergedPolys.geom_type=="MultiPolygon" or mergedPolys.geom_type=="GeometryCollection":
             thesepolys=[poly for poly in mergedPolys.geoms] 
         return thesepolys
+
     def spotFeaturePoints(self,featureName:str,splitAtWipe=False,includeRealStartPt=False, splitAtTravel=False)->list:
         parts=[]
         for idf,fe in enumerate(self.features):
@@ -616,14 +625,13 @@ class Layer():
             if featureName in ftype:
                 if includeRealStartPt and idf>0:
                     sp=self.getRealFeatureStartPoint(idf)
-                    if sp:pts.append(sp)       
+                    if sp:pts.append(sp)
                 for line in lines:
                     if "G1" in line and (not isWipeMove):
                         if (not "E" in line) and travelstr in line and splitAtTravel:
                             #print(f"Layer {self.layernumber}: try to split feature. No. of pts before:",len(pts))
                             if len(pts)>=2:#make at least 1 ls
                                 parts.append(pts)
-                            # clear points, even if we don't have enough to make a part
                             pts=[]# update self.features... TODO
                         elif "E" in line:     #maybe fix error of included travel moves? 
                             p=getPtfromCmd(line)
@@ -635,10 +643,10 @@ class Layer():
                             parts.append(pts)
                             pts=[]
                     if 'WIPE_END' in line:
-                        isWipeMove=False                  
+                        isWipeMove=False
                 if len(pts)>1:#fetch last one
-                    parts.append(pts)           
-        return parts                     
+                    parts.append(pts)
+        return parts
     def spotSolidInfill(self)->None:
         parts=self.spotFeaturePoints("Solid infill",splitAtTravel=True)
         for infillpts in parts:
@@ -683,7 +691,7 @@ class Layer():
         if parts:
             return [LineString(pts) for pts in parts]
         else:
-            return []    
+            return []
     def verifyinfillpolys(self,minDistForValidation:float=0.5)->None:
         '''Verify a poly by measuring the distance to any overhang parameters. Valid if measuredDist<minDistForValidation'''
         overhangs=self.getOverhangPerimeterLineStrings()
@@ -693,7 +701,7 @@ class Layer():
             if not allowedSpacePolygon:
                 input(f"Layer {self.layernumber}: no allowed space Polygon provided to layer obj, unable to run script. Press Enter.")
                 raise ValueError(f"Layer {self.layernumber}: no allowed space Polygon provided to layer obj")
-            if self.parameters.get("PrintDebugVerification"):print("No of Polys:",len(self.polys))    
+            if self.parameters.get("PrintDebugVerification"):print("No of Polys:",len(self.polys))
             for idp,poly in enumerate(self.polys):
                 if not poly.is_valid:
                     if self.parameters.get("PrintDebugVerification"):print(f"Layer {self.layernumber}: Poly{idp} is (shapely-)invalid")
@@ -703,14 +711,14 @@ class Layer():
                     continue
                 if poly.area<self.parameters.get("MinArea"):
                     if self.parameters.get("PrintDebugVerification"):print(f"Layer {self.layernumber}: Poly{idp} has to little area: {poly.area:.2f}")
-                    continue               
+                    continue
                 for ohp in overhangs:
                     if poly.distance(ohp)<minDistForValidation:
                         if ohp.length>self.parameters.get("MinBridgeLength"):
                             self.validpolys.append(poly)
                             self.deleteTheseInfills.append(idp)
                             break
-                if self.parameters.get("PrintDebugVerification"):print(f"Layer {self.layernumber}: Poly{idp} is not close enough to overhang perimeters")        
+                    if self.parameters.get("PrintDebugVerification"):print(f"Layer {self.layernumber}: Poly{idp} is not close enough to overhang perimeters")
 
     
     def prepareDeletion(self,featurename:str="Bridge",polys:list=None)->None:
