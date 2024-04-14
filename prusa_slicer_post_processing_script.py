@@ -37,6 +37,7 @@ import random
 import platform
 #from hilbertcurve.hilbertcurve import HilbertCurve
 from hilbert import decode, encode
+import argparse
 ########## Parameters  - adjust values here as needed ##########
 def makeFullSettingDict(gCodeSettingDict:dict) -> dict: 
     """Merge Two Dictionarys and set some keys/values explicitly"""
@@ -1189,9 +1190,21 @@ warnings.showwarning = _warning
 
 ################################# MAIN EXECUTION #################################
 ##################################################################################
-if __name__=="__main__":
-    gCodeFileStream,path2GCode = getFileStreamAndPath()
-    skipInput=False
-    if platform.system()!="Windows":
-        skipInput=True
-    main(gCodeFileStream,path2GCode, skipInput)
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Process G-code files.")
+    parser.add_argument('path', type=str, help='Path to the G-code file')
+    parser.add_argument('--skip-input', action='store_true', help='Skip any user input prompts (non-Windows only)')
+    return parser.parse_args()
+
+if __name__ == "__main__":
+    args = parse_args()
+
+    # Get file stream and path based on the provided path
+    gCodeFileStream, path2GCode = getFileStreamAndPath(args.path)
+
+    # Determine whether to skip input based on the platform and command line argument
+    skipInput = args.skip_input or platform.system() != "Windows"
+
+    # Call the main function with the arguments
+    main(gCodeFileStream, path2GCode, skipInput)
