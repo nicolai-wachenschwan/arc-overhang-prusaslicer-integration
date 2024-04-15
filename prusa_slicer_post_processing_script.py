@@ -26,6 +26,7 @@ Known issues:
 #!/usr/bin/python
 import sys
 import os
+import argparse
 from shapely import Point, Polygon, LineString, GeometryCollection, MultiLineString, MultiPolygon
 from shapely.ops import nearest_points
 from shapely.ops import linemerge, unary_union
@@ -37,7 +38,6 @@ import random
 import platform
 #from hilbertcurve.hilbertcurve import HilbertCurve
 from hilbert import decode, encode
-import argparse
 ########## Parameters  - adjust values here as needed ##########
 def makeFullSettingDict(gCodeSettingDict:dict) -> dict: 
     """Merge Two Dictionarys and set some keys/values explicitly"""
@@ -1192,7 +1192,7 @@ warnings.showwarning = _warning
 ##################################################################################
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Process G-code files.")
+    parser = argparse.ArgumentParser(description="Process overhangs within PrusaSlicer G-code files into circular arcs.")
     parser.add_argument('path', type=str, help='Path to the G-code file')
     parser.add_argument('--skip-input', action='store_true', help='Skip any user input prompts (non-Windows only)')
     return parser.parse_args()
