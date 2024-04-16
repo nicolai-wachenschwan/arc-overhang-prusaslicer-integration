@@ -276,15 +276,13 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
                         #    plot_geometry(Point(arc.coords[0]))
                         #plt.axis('square')
                         #plt.show()
-                        #remove empty arcs
-                        arcs4gcode = [x for x in arcs4gcode if not x.is_empty]
                         for ida,arc in enumerate(arcs4gcode):
-                            final_arc = ida == len(arcs4gcode) - 1
-                            arcGCode=arc2GCode(arcline=arc,eStepsPerMM=eStepsPerMM,arcidx=ida,final_arc=final_arc,kwargs=parameters)
-                            arcOverhangGCode.append(arcGCode)
-                            if parameters.get("TimeLapseEveryNArcs")>0:
-                                if ida%parameters.get("TimeLapseEveryNArcs"):
-                                    arcOverhangGCode.append("M240\n")
+                            if not arc.is_empty:    
+                                arcGCode=arc2GCode(arcline=arc,eStepsPerMM=eStepsPerMM,arcidx=ida,kwargs=parameters)
+                                arcOverhangGCode.append(arcGCode)
+                                if parameters.get("TimeLapseEveryNArcs")>0:
+                                    if ida%parameters.get("TimeLapseEveryNArcs"):
+                                        arcOverhangGCode.append("M240\n")
 
                 #apply special cooling settings:    
                 if len(layer.oldpolys)>0:
@@ -1137,7 +1135,7 @@ def retractGCode(retract:bool=True,kwargs:dict={})->str:
 def setFeedRateGCode(F:int)->str:
     return f"G1 F{F}\n"     
 
-def arc2GCode(arcline:LineString,eStepsPerMM:float,arcidx=None,final_arc=None,kwargs={})->list:
+def arc2GCode(arcline:LineString,eStepsPerMM:float,arcidx=None,kwargs={})->list:
     GCodeLines=[]
     p1=None
     pts=[Point(p) for p in arcline.coords]
@@ -1166,8 +1164,7 @@ def arc2GCode(arcline:LineString,eStepsPerMM:float,arcidx=None,final_arc=None,kw
                 p1=p
         if idp==len(pts)-1:
             GCodeLines.append(p2GCode(pExtend,E=extDist*eStepsPerMM))#extend arc tangentially for better bonding between arcs
-            if not final_arc:
-                GCodeLines.append(retractGCode(retract=True,kwargs=kwargs))
+            GCodeLines.append(retractGCode(retract=True,kwargs=kwargs))
     return GCodeLines        
 
 def hilbert2GCode(allhilbertpts:list,parameters:dict,layerheight:float):
