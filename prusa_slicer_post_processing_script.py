@@ -1153,9 +1153,7 @@ def arc2GCode(arcline:LineString,eStepsPerMM:float,arcidx=None,kwargs={})->list:
             p1=p
             GCodeLines.append(f";Arc {arcidx if arcidx else ' '} Length:{arcline.length}\n")
             GCodeLines.append(p2GCode(p,F=kwargs.get('ArcTravelFeedRate',100*60)))#feedrate is mm/min...
-            # Skip the first deretraction, assume slicer added it for layer change or travel
-            if arcidx > 0:    
-                GCodeLines.append(retractGCode(retract=False,kwargs=kwargs))
+            GCodeLines.append(retractGCode(retract=False,kwargs=kwargs))
             GCodeLines.append(setFeedRateGCode(arcPrintSpeed))
         else:
             dist=p.distance(p1)
