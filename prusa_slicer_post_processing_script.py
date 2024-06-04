@@ -109,9 +109,11 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
         input("Can not run script, gcode unmodified. Press enter to close.")
         raise ValueError("Incompatible Settings used!") 
     layerobjs=[]
+    startuplines = []
     gcodeWasModified=False
     if gCodeFileStream:
         layers=splitGCodeIntoLayers(gCodeLines)
+        startuplines = layers.pop(0)
         gCodeFileStream.close()
         print("layers:",len(layers))
         lastfansetting=0 # initialize variable
@@ -375,6 +377,7 @@ def main(gCodeFileStream,path2GCode,skipInput)->None:
             print("overwriting file")
         else: 
             print("write to",path2GCode)    
+        f.writelines(startuplines)
         for layer in layerobjs:
             f.writelines(layer.lines)
         f.close()   
@@ -1061,15 +1064,12 @@ def readSettingsFromGCode2dict(gcodeLines:list,fallbackValuesDict:dict)->dict:
             isSetting=True
             continue
         if isSetting :
-            setting=line.strip(";").strip("\n").split("= ")
+            setting=line.strip(";").strip("\n").split("= ", 1)
             if len(setting)==2:
                 try:
                     gCodeSettingDict[setting[0].strip(" ")]=literal_eval(setting[1]) # automaticly convert into int,float,...
                 except:
                     gCodeSettingDict[setting[0].strip(" ")]=setting[1] # leave the complex settings as strings. They shall be handled individually if necessary 
-            elif len(setting)>2:
-                gCodeSettingDict[setting[0].strip(" ")]=setting[1:]
-                warnings.warn(f"PrusaSlicer Setting {setting[0]} not in the expected key/value format, but added into the settings-dictionarry")
             else:    
                 print("Could not read setting from PrusaSlicer:",setting)
     if "%" in str(gCodeSettingDict.get("perimeter_extrusion_width")) : #overwrite Percentage width as suggested by 5axes via github                
