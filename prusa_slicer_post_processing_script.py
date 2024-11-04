@@ -91,10 +91,11 @@ def make_full_setting_dict(gcode_setting_dict: dict) -> dict:
 
 def main(gcode_file_stream, path2gcode, skip_input) -> None:
     gcode_lines = gcode_file_stream.readlines()
-    gcode_setting_dict = read_settings_from_gcode2dict(gcode_lines, {"Fallback_nozzle_diameter": 0.4, "Fallback_filament_diameter": 1.75})
+    slicer_type = detect_slicer_type(gcode_lines)
+    gcode_setting_dict = read_settings_from_gcode2dict(gcode_lines, {"Fallback_nozzle_diameter": 0.4, "Fallback_filament_diameter": 1.75}, slicer_type)
     parameters = make_full_setting_dict(gcode_setting_dict)
-    if not check_for_necessary_settings(gcode_setting_dict):
-        warnings.warn("Incompatible PursaSlicer-Settings used!")
+    if not check_for_necessary_settings(gcode_setting_dict, slicer_type):
+        warnings.warn("Incompatible Slicer-Settings used!")
         input("Can not run script, gcode unmodified. Press enter to close.")
         raise ValueError("Incompatible Settings used!")
     layer_objs = []
@@ -951,11 +952,14 @@ def get_arc_boundaries(concentric_arcs: list) -> list:
             boundaries.append(arc_line)
     return boundaries
 
-def read_settings_from_gcode2dict(gcode_lines: list, fallback_values_dict: dict) -> dict:
+def read_settings_from_gcode2dict(gcode_lines: list, fallback_values_dict: dict, slicer_type: str) -> dict:
     gcode_setting_dict = fallback_values_dict
     is_setting = False
     for line in gcode_lines:
-        if "; prusaslicer_config = begin" in line:
+        if slicer_type == "PrusaSlicer" and "; prusaslicer_config = begin" in line:
+            is_setting = True
+            continue
+        elif slicer_type == "OrcaSlicer" and "; orcaslicer_config = begin" in line:
             is_setting = True
             continue
         if is_setting:
@@ -966,7 +970,7 @@ def read_settings_from_gcode2dict(gcode_lines: list, fallback_values_dict: dict)
                 except:
                     gcode_setting_dict[setting[0].strip(" ")] = setting[1]
             else:
-                logging.warning(f"Could not read setting from PrusaSlicer: {setting}")
+                logging.warning(f"Could not read setting from {slicer_type}: {setting}")
     if "%" in str(gcode_setting_dict.get("perimeter_extrusion_width")):
         gcode_setting_dict["perimeter_extrusion_width"] = gcode_setting_dict.get("nozzle_diameter") * (float(gcode_setting_dict.get("perimeter_extrusion_width").strip("%")) / 100)
     is_warned = False
@@ -981,24 +985,24 @@ def read_settings_from_gcode2dict(gcode_lines: list, fallback_values_dict: dict)
                     is_warned = True
     return gcode_setting_dict
 
-def check_for_necessary_settings(gcode_setting_dict: dict) -> bool:
+def check_for_necessary_settings(gcode_setting_dict: dict, slicer_type: str) -> bool:
     if not gcode_setting_dict.get("use_relative_e_distances"):
-        warnings.warn("Script only works with relative e-distances enabled in PrusaSlicer. Change accordingly.")
+        warnings.warn("Script only works with relative e-distances enabled in the slicer. Change accordingly.")
         return False
     if gcode_setting_dict.get("extrusion_width") < 0.001 or gcode_setting_dict.get("perimeter_extrusion_width") < 0.001 or gcode_setting_dict.get("solid_infill_extrusion_width") < 0.001:
-        warnings.warn("Script only works with extrusion_width and perimeter_extrusion_width and solid_infill_extrusion_width>0. Change in PrusaSlicer accordingly.")
+        warnings.warn("Script only works with extrusion_width and perimeter_extrusion_width and solid_infill_extrusion_width>0. Change in the slicer accordingly.")
         return False
     if not gcode_setting_dict.get("overhangs"):
-        warnings.warn("Overhang detection disabled in PrusaSlicer. Activate in PrusaSlicer for script success!")
+        warnings.warn("Overhang detection disabled in the slicer. Activate in the slicer for script success!")
         return False
     if gcode_setting_dict.get("bridge_speed") > 5:
-        warnings.warn(f"Your Bridging Speed is set to {gcode_setting_dict.get('bridge_speed'):.0f} mm/s in PrusaSlicer. This can cause problems with warping.<=5mm/s is recommended")
+        warnings.warn(f"Your Bridging Speed is set to {gcode_setting_dict.get('bridge_speed'):.0f} mm/s in the slicer. This can cause problems with warping.<=5mm/s is recommended")
     if gcode_setting_dict.get("infill_first"):
-        warnings.warn("Infill set in PrusaSlicer to be printed before perimeter. This can cause problems with the script.")
+        warnings.warn("Infill set in the slicer to be printed before perimeter. This can cause problems with the script.")
     if gcode_setting_dict.get("external_perimeters_first"):
-        warnings.warn("PrusaSlicer-Setting: External perimeter is printed before inner perimeters. Change for better overhang performance.")
+        warnings.warn("Slicer-Setting: External perimeter is printed before inner perimeters. Change for better overhang performance.")
     if not gcode_setting_dict.get("avoid_crossing_perimeters"):
-        warnings.warn("PrusaSlicer-Setting: Travel Moves may cross the outline and therefore cause artefacts in arc generation.")
+        warnings.warn("Slicer-Setting: Travel Moves may cross the outline and therefore cause artefacts in arc generation.")
     return True
 
 def calc_e_steps_per_mm(settings_dict: dict, layer_height: float = None) -> float:
@@ -1073,6 +1077,14 @@ def hilbert2gcode(all_hilbert_pts: list, parameters: dict, layer_height: float):
             last_p = p
     hilbert_gcode.append(retract_gcode(True, parameters))
     return hilbert_gcode
+
+def detect_slicer_type(gcode_lines: list) -> str:
+    for line in gcode_lines:
+        if "; generated by PrusaSlicer" in line:
+            return "PrusaSlicer"
+        elif "; generated by OrcaSlicer" in line:
+            return "OrcaSlicer"
+    return "Unknown"
 
 def _warning(message, category=UserWarning, filename='', lineno=-1, *args, **kwargs):
     logging.warning(f"{filename}:{lineno}: {message}")

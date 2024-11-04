@@ -58,6 +58,30 @@ currently only using quotation marks " at the beginning and end of the path with
 
 If you want to change generation settings: Open the Script in an editor, scroll to 'Parameter' section. Settings from PrusaSlicer will be extracted automaticly from the gcode.
 
+## 4.1 Using the script with OrcaSlicer 2.1
+The script now supports OrcaSlicer 2.1. Follow these steps to set it up:
+
+1. Open OrcaSlicer and go to the print settings tab.
+2. Locate the window for post-processing scripts.
+3. In that window, enter the full path to your Python executable followed by the full path to the script. For example: `C:\full\path\to\your\python.exe C:\full\path\to\this\script\including\prusa_slicer_post_processing_script.py`
+4. OrcaSlicer will execute the script after the export of the Gcode. The view in OrcaSlicer won't change.
+5. Open the finished Gcode file to see the results.
+
+If any path contains empty spaces, mask them as described here (using "\ " on Unix-like systems and "! " on Windows): 
+https://manual.slic3r.org/advanced/post-processing
+https://help.prusa3d.com/article/post-processing-scripts_283913
+
+Currently, only using quotation marks " at the beginning and end of the path with empty spaces seems to work.
+
+## 4.2 Examples of OrcaSlicer-specific settings
+Here are some examples of OrcaSlicer-specific settings and how to configure them:
+
+1. **ArcCenterOffset**: The surface quality is improved by offsetting the arc center because the smallest radius is larger, allowing more time to cool. Set to 0 to get into delicate areas.
+2. **ExtendIntoPerimeter**: Enlarges the area where arcs are generated. Increase to thicken small/delicate passages. The minimum value for the algorithm to work is 0.5 extrusion width.
+3. **MaxDistanceFromPerimeter**: Controls how bumpy you tolerate your edge. A larger value results in fewer tiny arcs and better surface quality, while a smaller value follows the curvature more precisely.
+4. **UseLeastAmountOfCenterPoints**: Experimental setting that uses only one arc center until the maximum radius is reached, then iterates as usual. This improves surface finish but can lead to failed prints on complex geometries.
+5. **Special Cooling Settings**: Adjust the special cooling settings to your printer. This affects the follow-up layers to reduce warping. More cooling results in more warping.
+
 ## 5. Current Limitations
 1. Some settings need to be taylored to your specific geometry, just like you adapt the settings in your slicer. Details below.
 2. Code is slow on more complicated models.
@@ -251,3 +275,29 @@ PrintDebugVerification = False
 ```sh
 python prusa_slicer_post_processing_script.py config.ini <path_to_gcode_file>
 ```
+
+## 14. Slicers and Their Relationships
+
+Here's a list of the slicers mentioned, including their relationships as forks of PrusaSlicer:
+
+1. PrusaSlicer
+   - The original slicer developed by Prusa Research
+   - Based on Slic3r by Alessandro Ranellucci and the RepRap community
+
+2. BambuStudio
+   - Forked from PrusaSlicer
+   - Developed by Bambu Lab for their 3D printers
+
+3. OrcaSlicer
+   - Forked from BambuStudio
+   - Previously known as BambuStudio-SoftFever
+   - Developed by a user named Softfever
+   - Incorporates features from SuperSlicer
+
+All of these slicers share a common lineage, tracing back to the original PrusaSlicer. Each fork has added its own features and optimizations:
+
+- PrusaSlicer is tailored for Prusa 3D printers but also supports third-party printers.
+- BambuStudio was created specifically for Bambu Lab printers.
+- OrcaSlicer builds upon BambuStudio, adding more features and printer profiles.
+
+These forks allow for specialized development and features tailored to specific printers or user needs, while still maintaining compatibility with the core PrusaSlicer functionality.
