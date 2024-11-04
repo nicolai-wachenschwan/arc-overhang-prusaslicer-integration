@@ -1,0 +1,31 @@
+name: Run Script on Push
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python environment
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run script
+        run: python arc_overhang_integration.py examples/example.gcode
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: output-files
+          path: output/
